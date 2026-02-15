@@ -94,6 +94,17 @@ cd OnedriveAudit
 npm install
 ```
 
+3. Configure local environment:
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit .env and fill in your actual values
+# See docs/DEPLOYMENT.md for detailed setup instructions
+```
+
+**⚠️ Security Note:** The `.env` file contains secrets and is automatically ignored by git. Never commit secrets to the repository.
+
 ### Development Scripts
 
 - `npm run build` - Compile TypeScript to JavaScript
@@ -126,12 +137,21 @@ tests/            # Unit and integration tests
 
 ## 📊 Project Status
 
-**Current Phase:** Initial Planning (5% Complete)  
+**Current Phase:** Initial Planning (22% Complete)  
 **Last Updated:** February 15, 2026
 
 For detailed project status and next steps, see:
 - **[PROJECT-STATUS.md](./PROJECT-STATUS.md)** - Comprehensive status report with detailed assessment of all agents
 - **[NEXT-STEPS.md](./NEXT-STEPS.md)** - Quick reference guide with actionable next steps and code samples
+
+---
+
+## 🚀 Deployment
+
+For detailed deployment instructions including Azure infrastructure setup and manual secret configuration, see:
+- **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** - Complete deployment guide with step-by-step instructions
+
+**Important:** This application uses Function App Settings for secret management (no Key Vault required). All secrets must be configured manually after infrastructure provisioning.
 
 ---
 

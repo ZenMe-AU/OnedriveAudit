@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "FUNCTIONS_NODE_VERSION": "18",
+    "GRAPH_CLIENT_ID": "<your-azure-ad-app-registration-id>",
+    "GRAPH_CLIENT_SECRET": "<your-azure-ad-app-client-secret>",
+    "GRAPH_TENANT_ID": "<your-azure-ad-tenant-id>",
+    "DATABASE_URL": "postgresql://user:password@localhost:5432/onedriveaudit?sslmode=require",
+    "WEBHOOK_CLIENT_STATE": "<random-secret-string-min-32-chars>"
+  },
+  "Host": {
+    "LocalHttpPort": 7071,
+    "CORS": "*"
+  }
+}

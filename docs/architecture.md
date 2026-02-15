@@ -315,11 +315,17 @@ function detectChangeType(deltaItem, existingItem) {
 FUNCTIONS_WORKER_RUNTIME=node
 FUNCTIONS_NODE_VERSION=18
 GRAPH_CLIENT_ID=<Azure AD App Registration>
-GRAPH_CLIENT_SECRET=<Secret from Key Vault>
+GRAPH_CLIENT_SECRET=<Set manually in Function App Settings - NEVER commit to repository>
 GRAPH_TENANT_ID=<Azure AD Tenant>
-POSTGRES_CONNECTION_STRING=<from Key Vault>
-WEBHOOK_CLIENT_STATE=<random secret for validation>
+DATABASE_URL=<PostgreSQL connection string - Set manually in Function App Settings>
+WEBHOOK_CLIENT_STATE=<Random secret for validation - Set manually in Function App Settings>
 ```
+
+**Important Security Note:**
+- All secrets (`GRAPH_CLIENT_SECRET`, `DATABASE_URL`, `WEBHOOK_CLIENT_STATE`) MUST be configured manually in the Azure Function App Settings
+- These secrets should NEVER be stored in code, configuration files, or version control
+- For local development, use a `.env` file (already in `.gitignore`) to store secrets locally
+- Create a `.env.example` file with placeholder values as a template
 
 **Function Bindings:**
 
@@ -602,16 +608,18 @@ Manages active webhook subscriptions.
 - Principle of least privilege
 
 **Secrets Management:**
-- Client secrets stored in Azure Key Vault
-- Function app uses Managed Identity to access Key Vault
-- Secrets never in code or configuration files
-- Automatic rotation policy
+- Client secrets stored in Azure Function App Settings
+- Secrets are configured manually through Azure Portal or Azure CLI
+- Secrets never stored in code or configuration files committed to repository
+- For local development, use `.env` files (ignored by git)
+- Regular secret rotation recommended (manual process)
+- Use strong, randomly generated secrets (minimum 32 characters)
 
 ### Database Security
 
 **Connection Security:**
 - SSL/TLS required for all connections
-- Connection string in Key Vault
+- Connection string stored in Function App Settings (DATABASE_URL)
 - Azure AD authentication preferred over SQL auth
 
 **Access Control:**
@@ -723,18 +731,20 @@ Resource Group: rg-onedriveaudit-prod
 ├── Function App: func-onedriveaudit-prod
 │   ├── Plan: Consumption
 │   ├── Runtime: Node.js 18
-│   └── Storage: stodriveaudit
+│   ├── Storage: stodriveaudit
+│   └── Application Settings: (secrets configured manually)
+│       ├── GRAPH_CLIENT_SECRET
+│       ├── DATABASE_URL
+│       └── WEBHOOK_CLIENT_STATE
 ├── PostgreSQL: psql-onedriveaudit-prod
 │   ├── Tier: Flexible Server
 │   ├── SKU: Burstable B1ms
 │   └── Version: 14
-├── Storage Account: stodriveaudit
-│   └── Containers: azure-webjobs-*, function artifacts
-└── Key Vault: kv-onedriveaudit
-    ├── Secret: GraphClientSecret
-    ├── Secret: PostgresPassword
-    └── Secret: WebhookClientState
+└── Storage Account: stodriveaudit
+    └── Containers: azure-webjobs-*, function artifacts
 ```
+
+**Important:** Application Settings containing secrets must be configured manually through Azure Portal or Azure CLI after infrastructure provisioning.
 
 ### Environment Configuration
 
@@ -742,16 +752,19 @@ Resource Group: rg-onedriveaudit-prod
 - Local Functions runtime
 - Local PostgreSQL or Azure dev instance
 - Mock Graph API responses (testing)
+- Secrets stored in local `.env` file (not committed to git)
 
 **Staging:**
 - Azure Functions (dedicated resource group)
 - Azure PostgreSQL (separate instance)
 - Real Graph API (test tenant)
+- Secrets configured in Function App Settings
 
 **Production:**
 - Azure Functions (production resource group)
 - Azure PostgreSQL (production instance)
 - Real Graph API (production tenant)
+- Secrets configured in Function App Settings
 - Enhanced monitoring and alerting
 
 ### CI/CD Pipeline
@@ -767,7 +780,10 @@ Resource Group: rg-onedriveaudit-prod
 1. Package function app
 2. Deploy to Azure Functions
 3. Apply database migrations
-4. Update environment variables
+4. **Manually configure secrets in Function App Settings:**
+   - GRAPH_CLIENT_SECRET
+   - DATABASE_URL
+   - WEBHOOK_CLIENT_STATE
 5. Verify deployment health
 
 ### Infrastructure as Code
@@ -776,8 +792,9 @@ Resource Group: rg-onedriveaudit-prod
 - `functionapp.tf` - Function App and plan
 - `postgres.tf` - PostgreSQL server and database
 - `storage.tf` - Storage account
-- `keyvault.tf` - Key Vault and secrets
 - `monitoring.tf` - Application Insights
+
+**Note:** Secrets are not managed by Terraform and must be configured manually in Azure Function App Settings after deployment.
 
 **State Management:**
 - Terraform state in Azure Storage
