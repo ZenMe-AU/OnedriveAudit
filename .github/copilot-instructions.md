@@ -119,8 +119,8 @@ The application uses the following core data models:
 - Keep documentation up to date with code changes
 - Reference these key documents:
   - Architecture overview
-  - UML sequence diagrams for Function App flow
-  - UML class diagrams for data models
+  - Sequence diagrams for Function App flow
+  - Data model diagrams
 
 ### Documentation Standards for Diagrams
 

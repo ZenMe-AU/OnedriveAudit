@@ -497,6 +497,8 @@ Content-Type: application/json
 
 ### Entity Relationship Diagram
 
+**Note:** The `drive_items` table has a self-referencing relationship through `parent_id` to represent the hierarchical folder structure. This allows tracking of the complete folder/file tree within OneDrive.
+
 ```mermaid
 erDiagram
     drive_items ||--o{ drive_items : "parent_id (self-ref)"
