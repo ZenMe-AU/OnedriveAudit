@@ -122,6 +122,36 @@ The application uses the following core data models:
   - UML sequence diagrams for Function App flow
   - UML class diagrams for data models
 
+### Documentation Standards for Diagrams
+
+When creating or updating documentation with visual diagrams in markdown files:
+
+- **Prefer Mermaid diagrams** for all visual representations in `.md` files
+- Use Mermaid syntax for:
+  - **Sequence diagrams**: System interactions and workflows
+  - **Flowcharts**: Process flows and decision trees
+  - **Entity Relationship diagrams**: Database schemas and data models
+  - **State diagrams**: Component state transitions
+  - **Class diagrams**: Object-oriented design structures
+- Mermaid diagrams are rendered natively by GitHub and many markdown viewers
+- Keep diagram syntax clean and well-formatted for maintainability
+- Add descriptive titles and labels to diagram elements
+- Use consistent naming conventions in diagrams that match code entities
+
+Example Mermaid sequence diagram:
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant Function
+    participant GraphAPI
+    Admin->>Function: HTTP Request
+    Function->>GraphAPI: Authenticate
+    GraphAPI-->>Function: Access Token
+    Function-->>Admin: Success Response
+```
+
+For more information on Mermaid syntax, see: https://mermaid.js.org/
+
 ## Multi-Agent Architecture
 
 This project is designed to be built by seven cooperating AI agents:
