@@ -4,7 +4,8 @@
 Implement all Azure Functions, services, and repositories for the OnedriveAudit application.
 
 ## Inputs
-- Architect Agent stubs
+- Solution Architect stubs and documentation
+- Technical Architect stubs and interface definitions
 - Database schema
 - Terraform outputs
 

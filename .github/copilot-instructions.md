@@ -124,14 +124,15 @@ The application uses the following core data models:
 
 ## Multi-Agent Architecture
 
-This project is designed to be built by six cooperating AI agents:
+This project is designed to be built by seven cooperating AI agents:
 
 1. **Repo Creation Agent**: Initial setup and structure
-2. **Architect Agent**: Architecture, models, and documentation
-3. **Database Agent**: Schema design and implementation
-4. **Terraform IaC Agent**: Infrastructure provisioning
-5. **Backend Implementation Agent**: Core application logic
-6. **QA/Test Agent**: Test suite implementation
+2. **Solution Architect Agent**: Overall solution documentation and alignment between agents
+3. **Technical Architect Agent**: Technical design and coding standards
+4. **Database Agent**: Schema design and implementation
+5. **Terraform IaC Agent**: Infrastructure provisioning
+6. **Backend Implementation Agent**: Core application logic
+7. **QA/Test Agent**: Test suite implementation
 
 When contributing, ensure your work aligns with the agent responsibilities and maintains consistency across the codebase.
 

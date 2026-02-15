@@ -60,14 +60,15 @@ tests/
 
 ## 🧩 Multi‑Agent Build Process
 
-This project is built using six cooperating AI agents:
+This project is built using seven cooperating AI agents:
 
 1. **Repo Creation Agent** - See [repo-creation.md](./repo-creation.md)
-2. **Architect Agent** - See [architect-agent.md](./architect-agent.md)
-3. **Database Agent** - See [database-agent.md](./database-agent.md)
-4. **Terraform IaC Agent** - See [terraform-agent.md](./terraform-agent.md)
-5. **Backend Implementation Agent** - See [backend-agent.md](./backend-agent.md)
-6. **QA/Test Agent** - See [qa-agent.md](./qa-agent.md)
+2. **Solution Architect Agent** - See [solution-architect-agent.md](./solution-architect-agent.md)
+3. **Technical Architect Agent** - See [technical-architect-agent.md](./technical-architect-agent.md)
+4. **Database Agent** - See [database-agent.md](./database-agent.md)
+5. **Terraform IaC Agent** - See [terraform-agent.md](./terraform-agent.md)
+6. **Backend Implementation Agent** - See [backend-agent.md](./backend-agent.md)
+7. **QA/Test Agent** - See [qa-agent.md](./qa-agent.md)
 
 Each agent has a dedicated task specification file linked above.
 
