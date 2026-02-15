@@ -498,66 +498,36 @@ changeType = ChangeType.DELETE
 
 ### Service Layer Dependencies
 
-```
-┌─────────────────────────────────────────────────┐
-│              Function Layer                      │
-│  startRoutine                                    │
-│  onOneDriveWebhookNotification                  │
-│  processDeltaBatch                              │
-└─────────────────┬───────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────┐
-│              Service Layer                       │
-├──────────────────────────────────────────────────┤
-│  GraphClient                                    │
-│    ├─ authenticate()                            │
-│    ├─ createSubscription()                      │
-│    ├─ renewSubscription()                       │
-│    ├─ performDeltaQuery()                       │
-│    └─ handlePagination()                        │
-│                                                  │
-│  DeltaProcessor                                 │
-│    ├─ parseResponse()                           │
-│    ├─ detectChangeType()                        │
-│    ├─ buildPath()                               │
-│    └─ processBatch()                            │
-│                                                  │
-│  SubscriptionService                            │
-│    ├─ ensureSubscription()                      │
-│    ├─ monitorExpiration()                       │
-│    └─ renewBeforeExpiry()                       │
-│                                                  │
-│  DatabaseClient                                 │
-│    ├─ getConnection()                           │
-│    ├─ executeQuery()                            │
-│    ├─ beginTransaction()                        │
-│    └─ commit/rollback()                         │
-└─────────────────┬───────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────┐
-│          Repository Layer                        │
-├──────────────────────────────────────────────────┤
-│  DriveItemRepository                            │
-│    ├─ upsert()                                  │
-│    ├─ findByItemId()                            │
-│    ├─ markDeleted()                             │
-│    └─ getChildren()                             │
-│                                                  │
-│  ChangeEventRepository                          │
-│    ├─ insert()                                  │
-│    ├─ findByItem()                              │
-│    └─ findByDateRange()                         │
-│                                                  │
-│  DeltaStateRepository                           │
-│    ├─ getDeltaToken()                           │
-│    ├─ updateDeltaToken()                        │
-│    └─ getLastSync()                             │
-│                                                  │
-│  WebhookSubscriptionRepository                  │
-│    ├─ save()                                    │
-│    ├─ findBySubscriptionId()                    │
-│    └─ findExpiring()                            │
-└──────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph FunctionLayer["Function Layer"]
+        F1["startRoutine"]
+        F2["onOneDriveWebhookNotification"]
+        F3["processDeltaBatch"]
+    end
+    
+    subgraph ServiceLayer["Service Layer"]
+        GC["GraphClient<br/>├─ authenticate()<br/>├─ createSubscription()<br/>├─ renewSubscription()<br/>├─ performDeltaQuery()<br/>└─ handlePagination()"]
+        DP["DeltaProcessor<br/>├─ parseResponse()<br/>├─ detectChangeType()<br/>├─ buildPath()<br/>└─ processBatch()"]
+        SS["SubscriptionService<br/>├─ ensureSubscription()<br/>├─ monitorExpiration()<br/>└─ renewBeforeExpiry()"]
+        DC["DatabaseClient<br/>├─ getConnection()<br/>├─ executeQuery()<br/>├─ beginTransaction()<br/>└─ commit/rollback()"]
+    end
+    
+    subgraph RepositoryLayer["Repository Layer"]
+        DIR["DriveItemRepository<br/>├─ upsert()<br/>├─ findByItemId()<br/>├─ markDeleted()<br/>└─ getChildren()"]
+        CER["ChangeEventRepository<br/>├─ insert()<br/>├─ findByItem()<br/>└─ findByDateRange()"]
+        DSR["DeltaStateRepository<br/>├─ getDeltaToken()<br/>├─ updateDeltaToken()<br/>└─ getLastSync()"]
+        WSR["WebhookSubscriptionRepository<br/>├─ save()<br/>├─ findBySubscriptionId()<br/>└─ findExpiring()"]
+    end
+    
+    F1 --> ServiceLayer
+    F2 --> ServiceLayer
+    F3 --> ServiceLayer
+    
+    GC --> RepositoryLayer
+    DP --> RepositoryLayer
+    SS --> RepositoryLayer
+    DC --> RepositoryLayer
 ```
 
 ### Data Flow Between Components
@@ -583,86 +553,43 @@ changeType = ChangeType.DELETE
 
 ### Transient Error Retry Flow
 
-```
-Function Call
-     │
-     ▼
-Try Service Method
-     │
-     ├─[Success]──────────> Return Result
-     │
-     ├─[Transient Error]
-     │      │
-     │      ▼
-     │  Wait (exponential backoff)
-     │      │
-     │      ▼
-     │  Retry (attempt < max)
-     │      │
-     │      └──> [Loop back to Try]
-     │
-     └─[Permanent Error]──> Log & Throw
+```mermaid
+flowchart TD
+    Start[Function Call] --> Try[Try Service Method]
+    Try --> Success{Success?}
+    Success -->|Yes| Return[Return Result]
+    Success -->|Transient Error| Wait[Wait - exponential backoff]
+    Wait --> Retry{Retry attempt < max?}
+    Retry -->|Yes| Try
+    Retry -->|No| Permanent
+    Success -->|Permanent Error| Permanent[Log & Throw]
 ```
 
 ### Transaction Rollback Flow
 
-```
-Start Transaction
-     │
-     ▼
-Execute Operations
-     │
-     ├─[All Successful]
-     │      │
-     │      ▼
-     │  Commit Transaction
-     │      │
-     │      ▼
-     │  Return Success
-     │
-     └─[Any Failure]
-            │
-            ▼
-        Rollback Transaction
-            │
-            ▼
-        Log Error
-            │
-            ▼
-        Throw Exception
+```mermaid
+flowchart TD
+    Start[Start Transaction] --> Execute[Execute Operations]
+    Execute --> Check{All Successful?}
+    Check -->|Yes| Commit[Commit Transaction]
+    Commit --> Success[Return Success]
+    Check -->|Any Failure| Rollback[Rollback Transaction]
+    Rollback --> Log[Log Error]
+    Log --> Throw[Throw Exception]
 ```
 
 ### Queue Message Retry Flow
 
-```
-Receive Queue Message
-     │
-     ▼
-Process Message
-     │
-     ├─[Success]
-     │      │
-     │      ▼
-     │  Delete from Queue
-     │      │
-     │      ▼
-     │  Return
-     │
-     ├─[Transient Failure]
-     │      │
-     │      ▼
-     │  Leave in Queue
-     │      │
-     │      ▼
-     │  Auto-retry (queue mechanism)
-     │
-     └─[Max Retries Exceeded]
-            │
-            ▼
-        Move to Dead Letter Queue
-            │
-            ▼
-        Alert Operations
+```mermaid
+flowchart TD
+    Start[Receive Queue Message] --> Process[Process Message]
+    Process --> Check{Result?}
+    Check -->|Success| Delete[Delete from Queue]
+    Delete --> Return[Return]
+    Check -->|Transient Failure| Leave[Leave in Queue]
+    Leave --> AutoRetry[Auto-retry - queue mechanism]
+    Check -->|Max Retries Exceeded| DeadLetter[Move to Dead Letter Queue]
+    DeadLetter --> Alert[Alert Operations]
 ```
 
 ---
