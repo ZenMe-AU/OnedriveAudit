@@ -10,7 +10,15 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "prisma:format": "prisma format",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed",
+    "postinstall": "prisma generate"
   },
   "repository": {
     "type": "git",
@@ -28,6 +36,7 @@
     "@azure/functions": "^4.11.2",
     "@azure/identity": "^4.13.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@prisma/client": "^7.4.0",
     "pg": "^8.18.0"
   },
   "devDependencies": {
@@ -36,8 +45,10 @@
     "@types/pg": "^8.16.0",
     "@typescript-eslint/eslint-plugin": "^8.55.0",
     "@typescript-eslint/parser": "^8.55.0",
+    "dotenv": "^17.3.1",
     "eslint": "^9.39.2",
     "jest": "^30.2.0",
+    "prisma": "^7.4.0",
     "ts-jest": "^29.4.6",
     "typescript": "^5.9.3"
   }

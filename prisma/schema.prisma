@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enum for item types (file or folder)
+enum ItemType {
+  FILE
+  FOLDER
+}
+
+// Enum for change event types
+enum EventType {
+  CREATE
+  RENAME
+  MOVE
+  DELETE
+  UPDATE
+}
+
+// DriveItem model - Stores current state of all files and folders
+model DriveItem {
+  id          Int      @id @default(autoincrement())
+  driveId     String   @map("drive_id")
+  itemId      String   @unique @map("item_id")
+  name        String
+  itemType    ItemType @map("item_type")
+  parentId    Int?     @map("parent_id")
+  path        String
+  createdAt   DateTime @default(now()) @map("created_at")
+  modifiedAt  DateTime @default(now()) @updatedAt @map("modified_at")
+  isDeleted   Boolean  @default(false) @map("is_deleted")
+
+  // Self-referencing relation for parent/child hierarchy
+  parent      DriveItem?    @relation("DriveItemHierarchy", fields: [parentId], references: [id])
+  children    DriveItem[]   @relation("DriveItemHierarchy")
+  
+  // Relation to change events
+  changeEvents ChangeEvent[]
+
+  @@index([parentId])
+  @@index([driveId, isDeleted])
+  @@map("drive_items")
+}
+
+// ChangeEvent model - Audit log of all changes over time
+model ChangeEvent {
+  id            Int       @id @default(autoincrement())
+  driveItemId   Int       @map("drive_item_id")
+  eventType     EventType @map("event_type")
+  oldName       String?   @map("old_name")
+  newName       String?   @map("new_name")
+  oldParentId   Int?      @map("old_parent_id")
+  newParentId   Int?      @map("new_parent_id")
+  timestamp     DateTime  @default(now())
+
+  // Relation to drive item
+  driveItem     DriveItem @relation(fields: [driveItemId], references: [id])
+
+  @@index([driveItemId, timestamp])
+  @@index([timestamp])
+  @@map("change_events")
+}
+
+// DeltaState model - Tracks synchronization state per drive
+model DeltaState {
+  id          Int      @id @default(autoincrement())
+  driveId     String   @unique @map("drive_id")
+  deltaToken  String   @map("delta_token")
+  lastSync    DateTime @map("last_sync")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("delta_state")
+}
+
+// WebhookSubscription model - Manages active webhook subscriptions
+model WebhookSubscription {
+  id              Int      @id @default(autoincrement())
+  subscriptionId  String   @unique @map("subscription_id")
+  resource        String
+  clientState     String   @map("client_state")
+  expiration      DateTime
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("webhook_subscriptions")
+}
