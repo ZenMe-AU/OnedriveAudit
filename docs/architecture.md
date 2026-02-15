@@ -95,56 +95,35 @@ OnedriveAudit is a serverless Azure Functions application designed to track OneD
 
 ### High-Level Component Diagram
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Microsoft 365                            │
-│                                                                   │
-│  ┌────────────────┐                                             │
-│  │  OneDrive      │                                             │
-│  │  Storage       │                                             │
-│  └────────┬───────┘                                             │
-│           │                                                      │
-│  ┌────────▼────────┐                                            │
-│  │ Microsoft Graph │                                            │
-│  │  Delta API      │                                            │
-│  └────────┬────────┘                                            │
-└───────────┼──────────────────────────────────────────────────────┘
-            │
-            │ (1) Delta Queries
-            │ (2) Webhook Notifications
-            │
-┌───────────▼──────────────────────────────────────────────────────┐
-│                        Azure Functions                            │
-│                                                                   │
-│  ┌─────────────────┐  ┌──────────────────┐  ┌────────────────┐ │
-│  │  startRoutine   │  │ onWebhook        │  │ processDelta   │ │
-│  │  (HTTP)         │  │ Notification     │  │ Batch          │ │
-│  │                 │  │ (HTTP)           │  │ (Queue)        │ │
-│  └────────┬────────┘  └─────────┬────────┘  └────────┬───────┘ │
-│           │                     │                     │         │
-│           │    ┌────────────────┼─────────────────────┘         │
-│           │    │                │                               │
-│  ┌────────▼────▼────────────────▼──────────┐                   │
-│  │         Service Layer                    │                   │
-│  │  • Graph Client                          │                   │
-│  │  • Delta Processor                       │                   │
-│  │  • Subscription Service                  │                   │
-│  │  • Repository Layer                      │                   │
-│  └──────────────────┬───────────────────────┘                   │
-└─────────────────────┼─────────────────────────────────────────────┘
-                      │
-                      │ SQL Queries
-                      │
-┌─────────────────────▼─────────────────────────────────────────────┐
-│                    Azure PostgreSQL                               │
-│                                                                   │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────┐             │
-│  │ drive_items │  │ change_events│  │ delta_state│             │
-│  └─────────────┘  └──────────────┘  └────────────┘             │
-│  ┌─────────────────────────┐                                    │
-│  │ webhook_subscriptions   │                                    │
-│  └─────────────────────────┘                                    │
-└───────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Microsoft365["Microsoft 365"]
+        OneDrive["OneDrive Storage"]
+        GraphAPI["Microsoft Graph<br/>Delta API"]
+        OneDrive --> GraphAPI
+    end
+    
+    subgraph AzureFunctions["Azure Functions"]
+        StartRoutine["startRoutine<br/>(HTTP)"]
+        OnWebhook["onWebhook<br/>Notification<br/>(HTTP)"]
+        ProcessDelta["processDelta<br/>Batch<br/>(Queue)"]
+        
+        ServiceLayer["Service Layer<br/>• Graph Client<br/>• Delta Processor<br/>• Subscription Service<br/>• Repository Layer"]
+        
+        StartRoutine --> ServiceLayer
+        OnWebhook --> ServiceLayer
+        ProcessDelta --> ServiceLayer
+    end
+    
+    subgraph AzurePostgreSQL["Azure PostgreSQL"]
+        DriveItems["drive_items"]
+        ChangeEvents["change_events"]
+        DeltaState["delta_state"]
+        WebhookSubs["webhook_subscriptions"]
+    end
+    
+    GraphAPI -->|"(1) Delta Queries<br/>(2) Webhook Notifications"| AzureFunctions
+    ServiceLayer -->|SQL Queries| AzurePostgreSQL
 ```
 
 ### Component Descriptions
@@ -518,63 +497,55 @@ Content-Type: application/json
 
 ### Entity Relationship Diagram
 
+```mermaid
+erDiagram
+    drive_items ||--o{ drive_items : "parent_id (self-ref)"
+    drive_items ||--o{ change_events : "has"
+    
+    drive_items {
+        bigint id PK
+        varchar drive_id
+        varchar item_id UK "unique"
+        varchar name
+        varchar item_type "file/folder"
+        varchar parent_id FK "nullable"
+        text path
+        timestamp created_at
+        timestamp modified_at
+        boolean is_deleted
+    }
+    
+    change_events {
+        bigint id PK
+        varchar drive_item_id FK
+        varchar event_type "CREATE,RENAME,MOVE,DELETE,UPDATE"
+        varchar old_name "nullable"
+        varchar new_name "nullable"
+        varchar old_parent_id "nullable"
+        varchar new_parent_id "nullable"
+        timestamp timestamp
+    }
+    
+    delta_state {
+        bigint id PK
+        varchar drive_id UK "unique"
+        text delta_token
+        timestamp last_sync
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    webhook_subscriptions {
+        bigint id PK
+        varchar subscription_id UK "unique"
+        varchar resource
+        varchar client_state
+        timestamp expiration
+        timestamp created_at
+    }
 ```
-┌─────────────────────────┐
-│      drive_items        │
-│─────────────────────────│
-│ id (PK)                 │
-│ drive_id                │
-│ item_id (unique)        │
-│ name                    │
-│ item_type (file/folder) │
-│ parent_id (FK)          │◄──┐
-│ path                    │   │
-│ created_at              │   │
-│ modified_at             │   │
-│ is_deleted              │   │
-└────────┬────────────────┘   │
-         │                    │
-         │ Self-referencing   │
-         └────────────────────┘
-         │
-         │ 1:N
-         │
-         ▼
-┌─────────────────────────┐
-│    change_events        │
-│─────────────────────────│
-│ id (PK)                 │
-│ drive_item_id (FK)      │
-│ event_type              │
-│ old_name                │
-│ new_name                │
-│ old_parent_id           │
-│ new_parent_id           │
-│ timestamp               │
-└─────────────────────────┘
 
-┌─────────────────────────┐
-│     delta_state         │
-│─────────────────────────│
-│ id (PK)                 │
-│ drive_id (unique)       │
-│ delta_token             │
-│ last_sync               │
-│ created_at              │
-│ updated_at              │
-└─────────────────────────┘
-
-┌─────────────────────────┐
-│ webhook_subscriptions   │
-│─────────────────────────│
-│ id (PK)                 │
-│ subscription_id (unique)│
-│ resource                │
-│ client_state            │
-│ expiration              │
-│ created_at              │
-└─────────────────────────┘
-```
+**Note:** The `drive_items` table has a self-referencing relationship through `parent_id` to represent the hierarchical folder structure. This allows tracking of the complete folder/file tree within OneDrive.
 
 ### Table Descriptions
 

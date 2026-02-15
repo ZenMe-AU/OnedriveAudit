@@ -56,186 +56,88 @@ Initialize the system by setting up webhook subscription and performing initial 
 
 ### Sequence Diagram
 
-```
-┌────────┐         ┌──────────────┐         ┌───────────────┐         ┌──────────┐         ┌────────────┐
-│ Admin/ │         │ startRoutine │         │ GraphClient   │         │Microsoft │         │PostgreSQL  │
-│Scheduler│         │  (Function)  │         │   Service     │         │  Graph   │         │  Database  │
-└───┬────┘         └──────┬───────┘         └───────┬───────┘         └─────┬────┘         └──────┬─────┘
-    │                     │                         │                       │                      │
-    │ HTTP GET/POST       │                         │                       │                      │
-    │────────────────────>│                         │                       │                      │
-    │                     │                         │                       │                      │
-    │                     │ 1. Authenticate         │                       │                      │
-    │                     │────────────────────────>│                       │                      │
-    │                     │                         │                       │                      │
-    │                     │                         │ 2. Get Access Token   │                      │
-    │                     │                         │──────────────────────>│                      │
-    │                     │                         │                       │                      │
-    │                     │                         │ Access Token          │                      │
-    │                     │                         │<──────────────────────│                      │
-    │                     │                         │                       │                      │
-    │                     │ Authenticated Client    │                       │                      │
-    │                     │<────────────────────────│                       │                      │
-    │                     │                         │                       │                      │
-    │                     │ 3. Get Existing         │                       │                      │
-    │                     │    Subscriptions        │                       │                      │
-    │                     │────────────────────────>│                       │                      │
-    │                     │                         │                       │                      │
-    │                     │                         │ 4. GET /subscriptions │                      │
-    │                     │                         │──────────────────────>│                      │
-    │                     │                         │                       │                      │
-    │                     │                         │ Subscription List     │                      │
-    │                     │                         │<──────────────────────│                      │
-    │                     │                         │                       │                      │
-    │                     │ Subscriptions           │                       │                      │
-    │                     │<────────────────────────│                       │                      │
-    │                     │                         │                       │                      │
-    │    ┌────────────────────────────────────────────────────────────────────────────────────────┐
-    │    │ alt [Subscription exists and not expired]                                              │
-    │    │────────────────────────────────────────────────────────────────────────────────────────│
-    │    │                 │                         │                       │                      │
-    │    │                 │ 5. Update Expiration    │                       │                      │
-    │    │                 │────────────────────────>│                       │                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │                         │ 6. PATCH /subscriptions/{id}                 │
-    │    │                 │                         │──────────────────────>│                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │                         │ Updated Subscription  │                      │
-    │    │                 │                         │<──────────────────────│                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │ Subscription            │                       │                      │
-    │    │                 │<────────────────────────│                       │                      │
-    │    │────────────────────────────────────────────────────────────────────────────────────────│
-    │    │ [else] Create new subscription                                                          │
-    │    │────────────────────────────────────────────────────────────────────────────────────────│
-    │    │                 │                         │                       │                      │
-    │    │                 │ 7. Create Subscription  │                       │                      │
-    │    │                 │────────────────────────>│                       │                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │                         │ 8. POST /subscriptions│                      │
-    │    │                 │                         │    {                  │                      │
-    │    │                 │                         │      changeType: "updated",                  │
-    │    │                 │                         │      resource: "/drives/{id}/root",          │
-    │    │                 │                         │      notificationUrl,                       │
-    │    │                 │                         │      clientState      │                      │
-    │    │                 │                         │    }                  │                      │
-    │    │                 │                         │──────────────────────>│                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │                         │ 9. Validation Request │                      │
-    │    │                 │                         │   (validationToken)   │                      │
-    │    │                 │<──────────────────────────────────────────────────────────────────┐   │
-    │    │                 │                         │                       │                  │   │
-    │    │                 │ Return validationToken  │                       │                  │   │
-    │    │                 │───────────────────────────────────────────────────────────────────>│   │
-    │    │                 │                         │                       │                      │
-    │    │                 │                         │ Subscription Created  │                      │
-    │    │                 │                         │<──────────────────────│                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │ Subscription            │                       │                      │
-    │    │                 │<────────────────────────│                       │                      │
-    │    └────────────────────────────────────────────────────────────────────────────────────────┘
-    │                     │                         │                       │                      │
-    │                     │ 10. Save Subscription   │                       │                      │
-    │                     │─────────────────────────────────────────────────────────────────────>│
-    │                     │                         │                       │                      │
-    │                     │                         │ INSERT INTO webhook_subscriptions            │
-    │                     │                         │                       │                      │
-    │                     │ Saved                   │                       │                      │
-    │                     │<─────────────────────────────────────────────────────────────────────│
-    │                     │                         │                       │                      │
-    │                     │ 11. Get Delta Token     │                       │                      │
-    │                     │─────────────────────────────────────────────────────────────────────>│
-    │                     │                         │                       │                      │
-    │                     │                         │ SELECT delta_token FROM delta_state          │
-    │                     │                         │                       │                      │
-    │                     │ Token (or null)         │                       │                      │
-    │                     │<─────────────────────────────────────────────────────────────────────│
-    │                     │                         │                       │                      │
-    │    ┌────────────────────────────────────────────────────────────────────────────────────────┐
-    │    │ alt [Token exists]                                                                      │
-    │    │────────────────────────────────────────────────────────────────────────────────────────│
-    │    │                 │                         │                       │                      │
-    │    │                 │ 12. Delta Query         │                       │                      │
-    │    │                 │    (incremental)        │                       │                      │
-    │    │                 │────────────────────────>│                       │                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │                         │ 13. GET {deltaLink}   │                      │
-    │    │                 │                         │──────────────────────>│                      │
-    │    │────────────────────────────────────────────────────────────────────────────────────────│
-    │    │ [else] Initial delta query                                                              │
-    │    │────────────────────────────────────────────────────────────────────────────────────────│
-    │    │                 │                         │                       │                      │
-    │    │                 │ 14. Delta Query         │                       │                      │
-    │    │                 │    (initial)            │                       │                      │
-    │    │                 │────────────────────────>│                       │                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │                         │ 15. GET /drives/{id}/root/delta              │
-    │    │                 │                         │──────────────────────>│                      │
-    │    └────────────────────────────────────────────────────────────────────────────────────────┘
-    │                     │                         │                       │                      │
-    │    ┌────────────────────────────────────────────────────────────────────────────────────────┐
-    │    │ loop [For each page of results]                                                         │
-    │    │────────────────────────────────────────────────────────────────────────────────────────│
-    │    │                 │                         │                       │                      │
-    │    │                 │                         │ Delta Response        │                      │
-    │    │                 │                         │ {                     │                      │
-    │    │                 │                         │   value: [items],     │                      │
-    │    │                 │                         │   @odata.nextLink,    │                      │
-    │    │                 │                         │   @odata.deltaLink    │                      │
-    │    │                 │                         │ }                     │                      │
-    │    │                 │                         │<──────────────────────│                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │ Delta Items             │                       │                      │
-    │    │                 │<────────────────────────│                       │                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │ 16. Process Items       │                       │                      │
-    │    │                 │────────────────────────>│                       │                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │ [For each item]         │                       │                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │ 17. Upsert DriveItem    │                       │                      │
-    │    │                 │─────────────────────────────────────────────────────────────────────>│
-    │    │                 │                         │                       │                      │
-    │    │                 │                         │ INSERT ... ON CONFLICT UPDATE               │
-    │    │                 │                         │                       │                      │
-    │    │                 │ Success                 │                       │                      │
-    │    │                 │<─────────────────────────────────────────────────────────────────────│
-    │    │                 │                         │                       │                      │
-    │    │                 │ 18. Insert ChangeEvent  │                       │                      │
-    │    │                 │─────────────────────────────────────────────────────────────────────>│
-    │    │                 │                         │                       │                      │
-    │    │                 │                         │ INSERT INTO change_events                    │
-    │    │                 │                         │                       │                      │
-    │    │                 │ Success                 │                       │                      │
-    │    │                 │<─────────────────────────────────────────────────────────────────────│
-    │    │                 │                         │                       │                      │
-    │    │                 │ Items Processed         │                       │                      │
-    │    │                 │<────────────────────────│                       │                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │ [If @odata.nextLink]    │                       │                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │ 19. Get Next Page       │                       │                      │
-    │    │                 │────────────────────────>│                       │                      │
-    │    │                 │                         │                       │                      │
-    │    │                 │                         │ 20. GET {nextLink}    │                      │
-    │    │                 │                         │──────────────────────>│                      │
-    │    └────────────────────────────────────────────────────────────────────────────────────────┘
-    │                     │                         │                       │                      │
-    │                     │ 21. Update Delta Token  │                       │                      │
-    │                     │─────────────────────────────────────────────────────────────────────>│
-    │                     │                         │                       │                      │
-    │                     │                         │ INSERT/UPDATE delta_state                    │
-    │                     │                         │                       │                      │
-    │                     │ Success                 │                       │                      │
-    │                     │<─────────────────────────────────────────────────────────────────────│
-    │                     │                         │                       │                      │
-    │ HTTP 200 OK         │                         │                       │                      │
-    │ {                   │                         │                       │                      │
-    │   message: "Initialized",                     │                       │                      │
-    │   itemsProcessed: N │                         │                       │                      │
-    │ }                   │                         │                       │                      │
-    │<────────────────────│                         │                       │                      │
-    │                     │                         │                       │                      │
+```mermaid
+sequenceDiagram
+    participant Admin as Admin/Scheduler
+    participant Function as startRoutine<br/>(Function)
+    participant GraphClient as GraphClient<br/>Service
+    participant Graph as Microsoft<br/>Graph
+    participant DB as PostgreSQL<br/>Database
+
+    Admin->>Function: HTTP GET/POST
+    
+    Note over Function,Graph: 1. Authentication
+    Function->>GraphClient: 1. Authenticate
+    GraphClient->>Graph: 2. Get Access Token
+    Graph-->>GraphClient: Access Token
+    GraphClient-->>Function: Authenticated Client
+    
+    Note over Function,Graph: 2. Webhook Subscription Management
+    Function->>GraphClient: 3. Get Existing Subscriptions
+    GraphClient->>Graph: 4. GET /subscriptions
+    Graph-->>GraphClient: Subscription List
+    GraphClient-->>Function: Subscriptions
+    
+    alt Subscription exists and not expired
+        Function->>GraphClient: 5. Update Expiration
+        GraphClient->>Graph: 6. PATCH /subscriptions/{id}
+        Graph-->>GraphClient: Updated Subscription
+        GraphClient-->>Function: Subscription
+    else Create new subscription
+        Function->>GraphClient: 7. Create Subscription
+        GraphClient->>Graph: 8. POST /subscriptions<br/>{changeType, resource, notificationUrl, clientState}
+        Graph->>Function: 9. Validation Request (validationToken)
+        Function-->>Graph: Return validationToken
+        Graph-->>GraphClient: Subscription Created
+        GraphClient-->>Function: Subscription
+    end
+    
+    Function->>DB: 10. Save Subscription
+    Note right of DB: INSERT INTO webhook_subscriptions
+    DB-->>Function: Saved
+    
+    Note over Function,DB: 3. Delta Synchronization
+    Function->>DB: 11. Get Delta Token
+    Note right of DB: SELECT delta_token FROM delta_state
+    DB-->>Function: Token (or null)
+    
+    alt Token exists
+        Function->>GraphClient: 12. Delta Query (incremental)
+        GraphClient->>Graph: 13. GET {deltaLink}
+    else Initial delta query
+        Function->>GraphClient: 14. Delta Query (initial)
+        GraphClient->>Graph: 15. GET /drives/{id}/root/delta
+    end
+    
+    loop For each page of results
+        Graph-->>GraphClient: Delta Response<br/>{value: [items], @odata.nextLink, @odata.deltaLink}
+        GraphClient-->>Function: Delta Items
+        
+        Function->>GraphClient: 16. Process Items
+        
+        loop For each item
+            GraphClient->>DB: 17. Upsert DriveItem
+            Note right of DB: INSERT ... ON CONFLICT UPDATE
+            DB-->>GraphClient: Success
+            
+            GraphClient->>DB: 18. Insert ChangeEvent
+            Note right of DB: INSERT INTO change_events
+            DB-->>GraphClient: Success
+        end
+        
+        GraphClient-->>Function: Items Processed
+        
+        opt If @odata.nextLink
+            Function->>GraphClient: 19. Get Next Page
+            GraphClient->>Graph: 20. GET {nextLink}
+        end
+    end
+    
+    Function->>DB: 21. Update Delta Token
+    Note right of DB: INSERT/UPDATE delta_state
+    DB-->>Function: Success
+    
+    Function-->>Admin: HTTP 200 OK<br/>{message: "Initialized", itemsProcessed: N}
 ```
 
 ### Key Steps
@@ -301,101 +203,42 @@ Handle webhook notifications from Microsoft Graph when OneDrive changes occur.
 
 ### Sequence Diagram
 
-```
-┌────────────┐         ┌────────────────────────┐         ┌──────────────┐         ┌────────────┐
-│ Microsoft  │         │ onOneDriveWebhook      │         │   Queue      │         │ PostgreSQL │
-│   Graph    │         │ Notification (Function)│         │   Service    │         │  Database  │
-└─────┬──────┘         └────────────┬───────────┘         └──────┬───────┘         └──────┬─────┘
-      │                             │                            │                        │
-      │ POST /api/onWebhook         │                            │                        │
-      │ Headers:                    │                            │                        │
-      │   Content-Type: application/json                         │                        │
-      │ Query:                      │                            │                        │
-      │   ?validationToken={token}  │                            │                        │
-      │────────────────────────────>│                            │                        │
-      │                             │                            │                        │
-      │    ┌────────────────────────────────────────────────────────────────────────────────┐
-      │    │ alt [Validation Request]                                                        │
-      │    │────────────────────────────────────────────────────────────────────────────────│
-      │    │                         │                            │                        │
-      │    │                         │ 1. Detect validationToken  │                        │
-      │    │                         │    in query string         │                        │
-      │    │                         │                            │                        │
-      │    │                         │ 2. Return Token as plain/text                       │
-      │    │                         │                            │                        │
-      │    │ HTTP 200 OK             │                            │                        │
-      │    │ Content-Type: text/plain│                            │                        │
-      │    │ Body: {validationToken} │                            │                        │
-      │    │<────────────────────────│                            │                        │
-      │    │                         │                            │                        │
-      │    │────────────────────────────────────────────────────────────────────────────────│
-      │    │ [else] Change Notification                                                      │
-      │    │────────────────────────────────────────────────────────────────────────────────│
-      │    │                         │                            │                        │
-      │    │                         │ 3. Parse Notification Body │                        │
-      │    │                         │    {                       │                        │
-      │    │                         │      value: [{             │                        │
-      │    │                         │        subscriptionId,     │                        │
-      │    │                         │        clientState,        │                        │
-      │    │                         │        resource,           │                        │
-      │    │                         │        changeType          │                        │
-      │    │                         │      }]                    │                        │
-      │    │                         │    }                       │                        │
-      │    │                         │                            │                        │
-      │    │                         │ 4. Validate clientState    │                        │
-      │    │                         │────────────────────────────────────────────────────>│
-      │    │                         │                            │                        │
-      │    │                         │    SELECT client_state     │                        │
-      │    │                         │    FROM webhook_subscriptions                      │
-      │    │                         │    WHERE subscription_id = ?                       │
-      │    │                         │                            │                        │
-      │    │                         │ Stored clientState         │                        │
-      │    │                         │<────────────────────────────────────────────────────│
-      │    │                         │                            │                        │
-      │    │                         │ 5. Compare clientState     │                        │
-      │    │                         │    values                  │                        │
-      │    │                         │                            │                        │
-      │    │    ┌────────────────────────────────────────────────────────────────────────────┐
-      │    │    │ alt [clientState valid]                                                     │
-      │    │    │────────────────────────────────────────────────────────────────────────────│
-      │    │    │                     │                            │                        │
-      │    │    │                     │ 6. Create Queue Message    │                        │
-      │    │    │                     │    {                       │                        │
-      │    │    │                     │      subscriptionId,       │                        │
-      │    │    │                     │      resource,             │                        │
-      │    │    │                     │      changeType,           │                        │
-      │    │    │                     │      timestamp             │                        │
-      │    │    │                     │    }                       │                        │
-      │    │    │                     │                            │                        │
-      │    │    │                     │ 7. Enqueue Message         │                        │
-      │    │    │                     │───────────────────────────>│                        │
-      │    │    │                     │                            │                        │
-      │    │    │                     │                      Queue: delta-processing        │
-      │    │    │                     │                            │                        │
-      │    │    │                     │ Message Queued             │                        │
-      │    │    │                     │<───────────────────────────│                        │
-      │    │    │                     │                            │                        │
-      │    │    │                     │ 8. Log Success             │                        │
-      │    │    │                     │                            │                        │
-      │    │    │ HTTP 202 Accepted   │                            │                        │
-      │    │    │<────────────────────│                            │                        │
-      │    │    │────────────────────────────────────────────────────────────────────────────│
-      │    │    │ [else] Invalid clientState                                                  │
-      │    │    │────────────────────────────────────────────────────────────────────────────│
-      │    │    │                     │                            │                        │
-      │    │    │                     │ 9. Log Security Warning    │                        │
-      │    │    │                     │                            │                        │
-      │    │    │ HTTP 401 Unauthorized│                           │                        │
-      │    │    │<────────────────────│                            │                        │
-      │    │    └────────────────────────────────────────────────────────────────────────────┘
-      │    └────────────────────────────────────────────────────────────────────────────────┘
-      │                             │                            │                        │
-                                    │                            │                        │
-                                    │                      [Async Processing]              │
-                                    │                            │                        │
-                                    │                            │ processDeltaBatch      │
-                                    │                            │ (see next diagram)     │
-                                    │                            │                        │
+```mermaid
+sequenceDiagram
+    participant Graph as Microsoft<br/>Graph
+    participant Function as onOneDriveWebhook<br/>Notification (Function)
+    participant Queue as Queue<br/>Service
+    participant DB as PostgreSQL<br/>Database
+
+    Graph->>Function: POST /api/onWebhook<br/>?validationToken={token}
+    
+    alt Validation Request
+        Note over Function: 1. Detect validationToken<br/>in query string
+        Note over Function: 2. Return Token as plain/text
+        Function-->>Graph: HTTP 200 OK<br/>Content-Type: text/plain<br/>Body: {validationToken}
+    else Change Notification
+        Note over Function: 3. Parse Notification Body<br/>{value: [{subscriptionId, clientState, resource, changeType}]}
+        
+        Function->>DB: 4. Validate clientState
+        Note right of DB: SELECT client_state<br/>FROM webhook_subscriptions<br/>WHERE subscription_id = ?
+        DB-->>Function: Stored clientState
+        
+        Note over Function: 5. Compare clientState values
+        
+        alt clientState valid
+            Note over Function: 6. Create Queue Message<br/>{subscriptionId, resource, changeType, timestamp}
+            Function->>Queue: 7. Enqueue Message
+            Note right of Queue: Queue: delta-processing
+            Queue-->>Function: Message Queued
+            Note over Function: 8. Log Success
+            Function-->>Graph: HTTP 202 Accepted
+        else Invalid clientState
+            Note over Function: 9. Log Security Warning
+            Function-->>Graph: HTTP 401 Unauthorized
+        end
+    end
+    
+    Note over Queue: [Async Processing]<br/>processDeltaBatch<br/>(see next diagram)
 ```
 
 ### Key Steps
@@ -494,179 +337,72 @@ Process delta changes from Microsoft Graph and update database with new/modified
 
 ### Sequence Diagram
 
-```
-┌──────────┐         ┌─────────────────┐         ┌─────────────┐         ┌──────────┐         ┌────────────┐
-│  Queue   │         │ processDeltaBatch│        │DeltaProcessor│        │Microsoft │         │ PostgreSQL │
-│ Service  │         │   (Function)     │        │   Service    │        │  Graph   │         │  Database  │
-└────┬─────┘         └────────┬─────────┘        └──────┬──────┘        └─────┬────┘         └──────┬─────┘
-     │                        │                          │                     │                      │
-     │ Queue Message          │                          │                     │                      │
-     │ {                      │                          │                     │                      │
-     │   subscriptionId,      │                          │                     │                      │
-     │   resource,            │                          │                     │                      │
-     │   changeType           │                          │                     │                      │
-     │ }                      │                          │                     │                      │
-     │───────────────────────>│                          │                     │                      │
-     │                        │                          │                     │                      │
-     │                        │ 1. Extract Drive ID      │                     │                      │
-     │                        │    from resource path    │                     │                      │
-     │                        │                          │                     │                      │
-     │                        │ 2. Get Delta Token       │                     │                      │
-     │                        │─────────────────────────────────────────────────────────────────────>│
-     │                        │                          │                     │                      │
-     │                        │                          │ SELECT delta_token, last_sync              │
-     │                        │                          │ FROM delta_state                           │
-     │                        │                          │ WHERE drive_id = ?                         │
-     │                        │                          │                     │                      │
-     │                        │ Delta Token              │                     │                      │
-     │                        │<─────────────────────────────────────────────────────────────────────│
-     │                        │                          │                     │                      │
-     │                        │ 3. Execute Delta Query   │                     │                      │
-     │                        │─────────────────────────>│                     │                      │
-     │                        │                          │                     │                      │
-     │                        │                          │ 4. GET {deltaLink}  │                      │
-     │                        │                          │    or /root/delta   │                      │
-     │                        │                          │────────────────────>│                      │
-     │                        │                          │                     │                      │
-     │    ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
-     │    │ loop [While @odata.nextLink exists]                                                             │
-     │    │────────────────────────────────────────────────────────────────────────────────────────────────│
-     │    │                    │                          │                     │                      │
-     │    │                    │                          │ Delta Response      │                      │
-     │    │                    │                          │ {                   │                      │
-     │    │                    │                          │   value: [          │                      │
-     │    │                    │                          │     {               │                      │
-     │    │                    │                          │       id,           │                      │
-     │    │                    │                          │       name,         │                      │
-     │    │                    │                          │       parentReference,                     │
-     │    │                    │                          │       file/folder,  │                      │
-     │    │                    │                          │       deleted       │                      │
-     │    │                    │                          │     }               │                      │
-     │    │                    │                          │   ],                │                      │
-     │    │                    │                          │   @odata.nextLink,  │                      │
-     │    │                    │                          │   @odata.deltaLink  │                      │
-     │    │                    │                          │ }                   │                      │
-     │    │                    │                          │<────────────────────│                      │
-     │    │                    │                          │                     │                      │
-     │    │                    │ Items                    │                     │                      │
-     │    │                    │<─────────────────────────│                     │                      │
-     │    │                    │                          │                     │                      │
-     │    │    ┌────────────────────────────────────────────────────────────────────────────────────────────┐
-     │    │    │ loop [For each item in batch]                                                              │
-     │    │    │────────────────────────────────────────────────────────────────────────────────────────────│
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ 5. Get Existing Item     │                     │                      │
-     │    │    │                │─────────────────────────────────────────────────────────────────────>│
-     │    │    │                │                          │                     │                      │
-     │    │    │                │                          │ SELECT * FROM drive_items                  │
-     │    │    │                │                          │ WHERE item_id = ?                          │
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ Existing Item (or null)  │                     │                      │
-     │    │    │                │<─────────────────────────────────────────────────────────────────────│
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ 6. Detect Change Type    │                     │                      │
-     │    │    │                │─────────────────────────>│                     │                      │
-     │    │    │                │                          │                     │                      │
-     │    │    │                │                          │ Compare:            │                      │
-     │    │    │                │                          │ - Item existence    │                      │
-     │    │    │                │                          │ - Name changes      │                      │
-     │    │    │                │                          │ - Parent changes    │                      │
-     │    │    │                │                          │ - Deleted flag      │                      │
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ ChangeType              │                     │                      │
-     │    │    │                │ (CREATE/RENAME/         │                     │                      │
-     │    │    │                │  MOVE/DELETE/UPDATE)    │                     │                      │
-     │    │    │                │<─────────────────────────│                     │                      │
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ 7. Build Full Path       │                     │                      │
-     │    │    │                │─────────────────────────>│                     │                      │
-     │    │    │                │                          │                     │                      │
-     │    │    │                │                          │ Traverse parent_id  │                      │
-     │    │    │                │                          │ hierarchy to root   │                      │
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ Full Path               │                     │                      │
-     │    │    │                │<─────────────────────────│                     │                      │
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ 8. Start Transaction     │                     │                      │
-     │    │    │                │─────────────────────────────────────────────────────────────────────>│
-     │    │    │                │                          │                     │                      │
-     │    │    │                │                          │ BEGIN TRANSACTION                          │
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ Transaction Started      │                     │                      │
-     │    │    │                │<─────────────────────────────────────────────────────────────────────│
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ 9. Upsert DriveItem      │                     │                      │
-     │    │    │                │─────────────────────────────────────────────────────────────────────>│
-     │    │    │                │                          │                     │                      │
-     │    │    │                │                          │ INSERT INTO drive_items                    │
-     │    │    │                │                          │ (item_id, name, parent_id, path, ...)     │
-     │    │    │                │                          │ VALUES (?, ?, ?, ?, ...)                   │
-     │    │    │                │                          │ ON CONFLICT (item_id)                      │
-     │    │    │                │                          │ DO UPDATE SET                             │
-     │    │    │                │                          │   name = EXCLUDED.name,                    │
-     │    │    │                │                          │   parent_id = EXCLUDED.parent_id,          │
-     │    │    │                │                          │   path = EXCLUDED.path,                    │
-     │    │    │                │                          │   modified_at = EXCLUDED.modified_at,      │
-     │    │    │                │                          │   is_deleted = EXCLUDED.is_deleted         │
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ Row Updated/Inserted     │                     │                      │
-     │    │    │                │<─────────────────────────────────────────────────────────────────────│
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ 10. Insert ChangeEvent   │                     │                      │
-     │    │    │                │─────────────────────────────────────────────────────────────────────>│
-     │    │    │                │                          │                     │                      │
-     │    │    │                │                          │ INSERT INTO change_events                  │
-     │    │    │                │                          │ (drive_item_id, event_type,                │
-     │    │    │                │                          │  old_name, new_name,                       │
-     │    │    │                │                          │  old_parent_id, new_parent_id,             │
-     │    │    │                │                          │  timestamp)                               │
-     │    │    │                │                          │ VALUES (?, ?, ?, ?, ?, ?, ?)               │
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ Event Inserted           │                     │                      │
-     │    │    │                │<─────────────────────────────────────────────────────────────────────│
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ 11. Commit Transaction   │                     │                      │
-     │    │    │                │─────────────────────────────────────────────────────────────────────>│
-     │    │    │                │                          │                     │                      │
-     │    │    │                │                          │ COMMIT                                     │
-     │    │    │                │                          │                     │                      │
-     │    │    │                │ Committed                │                     │                      │
-     │    │    │                │<─────────────────────────────────────────────────────────────────────│
-     │    │    └────────────────────────────────────────────────────────────────────────────────────────────┘
-     │    │                    │                          │                     │                      │
-     │    │                    │ 12. Get Next Page        │                     │                      │
-     │    │                    │─────────────────────────>│                     │                      │
-     │    │                    │                          │                     │                      │
-     │    │                    │                          │ 13. GET {nextLink}  │                      │
-     │    │                    │                          │────────────────────>│                      │
-     │    └────────────────────────────────────────────────────────────────────────────────────────────────┘
-     │                        │                          │                     │                      │
-     │                        │ 14. Extract Delta Link   │                     │                      │
-     │                        │─────────────────────────>│                     │                      │
-     │                        │                          │                     │                      │
-     │                        │                          │ Parse @odata.deltaLink                     │
-     │                        │                          │ from final response │                      │
-     │                        │                          │                     │                      │
-     │                        │ New Delta Token          │                     │                      │
-     │                        │<─────────────────────────│                     │                      │
-     │                        │                          │                     │                      │
-     │                        │ 15. Update Delta State   │                     │                      │
-     │                        │─────────────────────────────────────────────────────────────────────>│
-     │                        │                          │                     │                      │
-     │                        │                          │ INSERT INTO delta_state                    │
-     │                        │                          │ (drive_id, delta_token, last_sync)         │
-     │                        │                          │ VALUES (?, ?, NOW())                       │
-     │                        │                          │ ON CONFLICT (drive_id)                     │
-     │                        │                          │ DO UPDATE SET                             │
-     │                        │                          │   delta_token = EXCLUDED.delta_token,      │
-     │                        │                          │   last_sync = NOW()                        │
-     │                        │                          │                     │                      │
-     │                        │ State Updated            │                     │                      │
-     │                        │<─────────────────────────────────────────────────────────────────────│
-     │                        │                          │                     │                      │
-     │ Message Completed      │                          │                     │                      │
-     │<───────────────────────│                          │                     │                      │
-     │                        │                          │                     │                      │
+```mermaid
+sequenceDiagram
+    participant Queue as Queue<br/>Service
+    participant Function as processDeltaBatch<br/>(Function)
+    participant Processor as DeltaProcessor<br/>Service
+    participant Graph as Microsoft<br/>Graph
+    participant DB as PostgreSQL<br/>Database
+
+    Queue->>Function: Queue Message<br/>{subscriptionId, resource, changeType}
+    
+    Note over Function: 1. Extract Drive ID<br/>from resource path
+    
+    Function->>DB: 2. Get Delta Token
+    Note right of DB: SELECT delta_token, last_sync<br/>FROM delta_state<br/>WHERE drive_id = ?
+    DB-->>Function: Delta Token
+    
+    Function->>Processor: 3. Execute Delta Query
+    Processor->>Graph: 4. GET {deltaLink}<br/>or /root/delta
+    
+    loop While @odata.nextLink exists
+        Graph-->>Processor: Delta Response<br/>{value: [{id, name, parentReference, file/folder, deleted}],<br/>@odata.nextLink, @odata.deltaLink}
+        Processor-->>Function: Items
+        
+        loop For each item in batch
+            Function->>DB: 5. Get Existing Item
+            Note right of DB: SELECT * FROM drive_items<br/>WHERE item_id = ?
+            DB-->>Function: Existing Item (or null)
+            
+            Function->>Processor: 6. Detect Change Type
+            Note over Processor: Compare:<br/>- Item existence<br/>- Name changes<br/>- Parent changes<br/>- Deleted flag
+            Processor-->>Function: ChangeType<br/>(CREATE/RENAME/MOVE/DELETE/UPDATE)
+            
+            Function->>Processor: 7. Build Full Path
+            Note over Processor: Traverse parent_id<br/>hierarchy to root
+            Processor-->>Function: Full Path
+            
+            Function->>DB: 8. Start Transaction
+            Note right of DB: BEGIN TRANSACTION
+            DB-->>Function: Transaction Started
+            
+            Function->>DB: 9. Upsert DriveItem
+            Note right of DB: INSERT INTO drive_items<br/>(item_id, name, parent_id, path, ...)<br/>ON CONFLICT (item_id)<br/>DO UPDATE SET...
+            DB-->>Function: Row Updated/Inserted
+            
+            Function->>DB: 10. Insert ChangeEvent
+            Note right of DB: INSERT INTO change_events<br/>(drive_item_id, event_type,<br/>old_name, new_name, ...)
+            DB-->>Function: Event Inserted
+            
+            Function->>DB: 11. Commit Transaction
+            Note right of DB: COMMIT
+            DB-->>Function: Committed
+        end
+        
+        Function->>Processor: 12. Get Next Page
+        Processor->>Graph: 13. GET {nextLink}
+    end
+    
+    Function->>Processor: 14. Extract Delta Link
+    Note over Processor: Parse @odata.deltaLink<br/>from final response
+    Processor-->>Function: New Delta Token
+    
+    Function->>DB: 15. Update Delta State
+    Note right of DB: INSERT INTO delta_state<br/>(drive_id, delta_token, last_sync)<br/>ON CONFLICT (drive_id)<br/>DO UPDATE SET...
+    DB-->>Function: State Updated
+    
+    Function-->>Queue: Message Completed
 ```
 
 ### Key Steps
@@ -762,66 +498,36 @@ changeType = ChangeType.DELETE
 
 ### Service Layer Dependencies
 
-```
-┌─────────────────────────────────────────────────┐
-│              Function Layer                      │
-│  startRoutine                                    │
-│  onOneDriveWebhookNotification                  │
-│  processDeltaBatch                              │
-└─────────────────┬───────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────┐
-│              Service Layer                       │
-├──────────────────────────────────────────────────┤
-│  GraphClient                                    │
-│    ├─ authenticate()                            │
-│    ├─ createSubscription()                      │
-│    ├─ renewSubscription()                       │
-│    ├─ performDeltaQuery()                       │
-│    └─ handlePagination()                        │
-│                                                  │
-│  DeltaProcessor                                 │
-│    ├─ parseResponse()                           │
-│    ├─ detectChangeType()                        │
-│    ├─ buildPath()                               │
-│    └─ processBatch()                            │
-│                                                  │
-│  SubscriptionService                            │
-│    ├─ ensureSubscription()                      │
-│    ├─ monitorExpiration()                       │
-│    └─ renewBeforeExpiry()                       │
-│                                                  │
-│  DatabaseClient                                 │
-│    ├─ getConnection()                           │
-│    ├─ executeQuery()                            │
-│    ├─ beginTransaction()                        │
-│    └─ commit/rollback()                         │
-└─────────────────┬───────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────┐
-│          Repository Layer                        │
-├──────────────────────────────────────────────────┤
-│  DriveItemRepository                            │
-│    ├─ upsert()                                  │
-│    ├─ findByItemId()                            │
-│    ├─ markDeleted()                             │
-│    └─ getChildren()                             │
-│                                                  │
-│  ChangeEventRepository                          │
-│    ├─ insert()                                  │
-│    ├─ findByItem()                              │
-│    └─ findByDateRange()                         │
-│                                                  │
-│  DeltaStateRepository                           │
-│    ├─ getDeltaToken()                           │
-│    ├─ updateDeltaToken()                        │
-│    └─ getLastSync()                             │
-│                                                  │
-│  WebhookSubscriptionRepository                  │
-│    ├─ save()                                    │
-│    ├─ findBySubscriptionId()                    │
-│    └─ findExpiring()                            │
-└──────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph FunctionLayer["Function Layer"]
+        F1["startRoutine"]
+        F2["onOneDriveWebhookNotification"]
+        F3["processDeltaBatch"]
+    end
+    
+    subgraph ServiceLayer["Service Layer"]
+        GC["GraphClient<br/>├─ authenticate()<br/>├─ createSubscription()<br/>├─ renewSubscription()<br/>├─ performDeltaQuery()<br/>└─ handlePagination()"]
+        DP["DeltaProcessor<br/>├─ parseResponse()<br/>├─ detectChangeType()<br/>├─ buildPath()<br/>└─ processBatch()"]
+        SS["SubscriptionService<br/>├─ ensureSubscription()<br/>├─ monitorExpiration()<br/>└─ renewBeforeExpiry()"]
+        DC["DatabaseClient<br/>├─ getConnection()<br/>├─ executeQuery()<br/>├─ beginTransaction()<br/>└─ commit/rollback()"]
+    end
+    
+    subgraph RepositoryLayer["Repository Layer"]
+        DIR["DriveItemRepository<br/>├─ upsert()<br/>├─ findByItemId()<br/>├─ markDeleted()<br/>└─ getChildren()"]
+        CER["ChangeEventRepository<br/>├─ insert()<br/>├─ findByItem()<br/>└─ findByDateRange()"]
+        DSR["DeltaStateRepository<br/>├─ getDeltaToken()<br/>├─ updateDeltaToken()<br/>└─ getLastSync()"]
+        WSR["WebhookSubscriptionRepository<br/>├─ save()<br/>├─ findBySubscriptionId()<br/>└─ findExpiring()"]
+    end
+    
+    F1 --> ServiceLayer
+    F2 --> ServiceLayer
+    F3 --> ServiceLayer
+    
+    GC --> RepositoryLayer
+    DP --> RepositoryLayer
+    SS --> RepositoryLayer
+    DC --> RepositoryLayer
 ```
 
 ### Data Flow Between Components
@@ -847,86 +553,43 @@ changeType = ChangeType.DELETE
 
 ### Transient Error Retry Flow
 
-```
-Function Call
-     │
-     ▼
-Try Service Method
-     │
-     ├─[Success]──────────> Return Result
-     │
-     ├─[Transient Error]
-     │      │
-     │      ▼
-     │  Wait (exponential backoff)
-     │      │
-     │      ▼
-     │  Retry (attempt < max)
-     │      │
-     │      └──> [Loop back to Try]
-     │
-     └─[Permanent Error]──> Log & Throw
+```mermaid
+flowchart TD
+    Start[Function Call] --> Try[Try Service Method]
+    Try --> Success{Success?}
+    Success -->|Yes| Return[Return Result]
+    Success -->|Transient Error| Wait[Wait - exponential backoff]
+    Wait --> Retry{Retry attempt < max?}
+    Retry -->|Yes| Try
+    Retry -->|No| Permanent
+    Success -->|Permanent Error| Permanent[Log & Throw]
 ```
 
 ### Transaction Rollback Flow
 
-```
-Start Transaction
-     │
-     ▼
-Execute Operations
-     │
-     ├─[All Successful]
-     │      │
-     │      ▼
-     │  Commit Transaction
-     │      │
-     │      ▼
-     │  Return Success
-     │
-     └─[Any Failure]
-            │
-            ▼
-        Rollback Transaction
-            │
-            ▼
-        Log Error
-            │
-            ▼
-        Throw Exception
+```mermaid
+flowchart TD
+    Start[Start Transaction] --> Execute[Execute Operations]
+    Execute --> Check{All Successful?}
+    Check -->|Yes| Commit[Commit Transaction]
+    Commit --> Success[Return Success]
+    Check -->|Any Failure| Rollback[Rollback Transaction]
+    Rollback --> Log[Log Error]
+    Log --> Throw[Throw Exception]
 ```
 
 ### Queue Message Retry Flow
 
-```
-Receive Queue Message
-     │
-     ▼
-Process Message
-     │
-     ├─[Success]
-     │      │
-     │      ▼
-     │  Delete from Queue
-     │      │
-     │      ▼
-     │  Return
-     │
-     ├─[Transient Failure]
-     │      │
-     │      ▼
-     │  Leave in Queue
-     │      │
-     │      ▼
-     │  Auto-retry (queue mechanism)
-     │
-     └─[Max Retries Exceeded]
-            │
-            ▼
-        Move to Dead Letter Queue
-            │
-            ▼
-        Alert Operations
+```mermaid
+flowchart TD
+    Start[Receive Queue Message] --> Process[Process Message]
+    Process --> Check{Result?}
+    Check -->|Success| Delete[Delete from Queue]
+    Delete --> Return[Return]
+    Check -->|Transient Failure| Leave[Leave in Queue]
+    Leave --> AutoRetry[Auto-retry - queue mechanism]
+    Check -->|Max Retries Exceeded| DeadLetter[Move to Dead Letter Queue]
+    DeadLetter --> Alert[Alert Operations]
 ```
 
 ---
