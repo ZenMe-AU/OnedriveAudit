@@ -74,6 +74,54 @@ Each agent has a dedicated task specification file linked above.
 
 ---
 
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18.x or later
+- npm 9.x or later
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/ZenMe-AU/OnedriveAudit.git
+cd OnedriveAudit
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+### Development Scripts
+
+- `npm run build` - Compile TypeScript to JavaScript
+- `npm run typecheck` - Type-check without emitting files
+- `npm test` - Run Jest tests
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Run tests with coverage report
+- `npm run lint` - Lint TypeScript files
+- `npm run lint:fix` - Lint and auto-fix issues
+
+### Project Structure
+
+```
+src/
+  functions/      # Azure Functions entry points
+  services/       # Business logic and service layer
+  models/         # TypeScript data models and interfaces
+  config/         # Configuration management
+  utils/          # Utility functions and helpers
+
+schemas/          # Database schemas
+terraform/        # Infrastructure as Code
+docs/             # Architecture and design documentation
+tests/            # Unit and integration tests
+  unit/           # Unit tests
+  integration/    # Integration tests
+```
+
 ---
 
 ## 📊 Project Status
