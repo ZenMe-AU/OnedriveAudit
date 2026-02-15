@@ -13,6 +13,26 @@ export default [
         sourceType: 'module',
         project: './tsconfig.json',
       },
+      globals: {
+        // Node.js globals
+        process: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        module: 'readonly',
+        require: 'readonly',
+        Buffer: 'readonly',
+        global: 'readonly',
+        globalThis: 'readonly',
+        // Jest globals for test files
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        jest: 'readonly',
+      },
     },
     plugins: {
       '@typescript-eslint': tseslint,
@@ -25,6 +45,6 @@ export default [
     },
   },
   {
-    ignores: ['node_modules/', 'dist/', '*.js'],
+    ignores: ['node_modules/', 'dist/', '*.js', 'src/generated/**', 'prisma.config.ts'],
   },
 ];
