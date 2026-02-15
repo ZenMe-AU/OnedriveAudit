@@ -1,0 +1,44 @@
+{
+  "name": "onedriveaudit",
+  "version": "1.0.0",
+  "description": "A serverless Azure Functions application written in **Node.js + TypeScript** that tracks **OneDrive folder and file structure changes** (create, rename, move, delete) using the **Microsoft Graph delta API** and **webhooks**, storing all state and history in **Azure PostgreSQL**. Infrastructure is provisioned using **Terraform**.",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZenMe-AU/OnedriveAudit.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ZenMe-AU/OnedriveAudit/issues"
+  },
+  "homepage": "https://github.com/ZenMe-AU/OnedriveAudit#readme",
+  "dependencies": {
+    "@azure/functions": "^4.11.2",
+    "@azure/identity": "^4.13.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "pg": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.2.3",
+    "@types/pg": "^8.16.0",
+    "@typescript-eslint/eslint-plugin": "^8.55.0",
+    "@typescript-eslint/parser": "^8.55.0",
+    "eslint": "^9.39.2",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.9.3"
+  }
+}
