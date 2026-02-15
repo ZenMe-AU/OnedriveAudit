@@ -34,22 +34,31 @@ The OnedriveAudit project has completed its comprehensive architecture documenta
    - `docs/architecture.md` - Complete system architecture (900+ lines)
      - System overview and goals
      - Technology stack details
-     - High-level component diagrams (ASCII art)
+     - High-level component diagrams (Mermaid format)
      - Data flow diagrams
      - Azure services integration details
      - Microsoft Graph integration (authentication, delta API, webhooks)
-     - Complete data model with ERD
+     - Complete data model with ERD (Mermaid format)
      - Security & authentication patterns
      - Error handling & resilience strategies
      - Deployment architecture
      - Scalability considerations
    - `docs/uml-sequence-function-app.md` - Complete sequence diagrams (1000+ lines)
-     - startRoutine sequence (webhook setup and initial sync)
-     - onOneDriveWebhookNotification sequence (webhook handling)
-     - processDeltaBatch sequence (delta processing)
-     - Component interaction diagrams
-     - Error handling flows
+     - startRoutine sequence (webhook setup and initial sync, Mermaid format)
+     - onOneDriveWebhookNotification sequence (webhook handling, Mermaid format)
+     - processDeltaBatch sequence (delta processing, Mermaid format)
+     - Component interaction diagrams (Mermaid format)
+     - Error handling flows (Mermaid format)
      - Performance considerations
+
+4. **Documentation Standards Enhancement**
+   - Updated `.github/copilot-instructions.md` with Mermaid diagram standards
+   - All ASCII art diagrams converted to Mermaid format for:
+     - Better rendering in GitHub and modern markdown viewers
+     - Easier maintenance and updates
+     - Native GitHub support without external tools
+     - Version control friendly (text-based)
+   - Documentation guidelines specify when and how to use Mermaid diagrams
 
 ### ❌ Outstanding Items
 
