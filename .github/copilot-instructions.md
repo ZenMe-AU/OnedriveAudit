@@ -243,10 +243,14 @@ This ensures that all team members and agents have an accurate, real-time view o
 ## Security
 
 - Never commit secrets or credentials to the repository
+- Store all secrets in Azure Function App Settings (configured manually)
+- Use `.env` files for local development (already in `.gitignore`)
+- Create `.env.example` with placeholder values as a template
 - Use environment variables for configuration
 - Implement proper authentication for Azure Functions
 - Validate all input data
 - Use secure connections for database and API calls
+- Regularly rotate secrets (GRAPH_CLIENT_SECRET, DATABASE_URL, WEBHOOK_CLIENT_STATE)
 
 ## Performance
 
