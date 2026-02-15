@@ -74,6 +74,34 @@ export class DeltaStateRepository {
       where: { driveId },
     });
   }
+
+  /**
+   * Clear the delta token for a drive (forces full sync on next query)
+   */
+  async clearDeltaToken(driveId: string): Promise<void> {
+    const state = await prisma.deltaState.findUnique({
+      where: { driveId },
+    });
+    
+    if (state) {
+      await prisma.deltaState.update({
+        where: { driveId },
+        data: {
+          deltaToken: '',
+          updatedAt: new Date(),
+        },
+      });
+    }
+  }
+
+  /**
+   * Find delta state by drive ID
+   */
+  async findByDriveId(driveId: string): Promise<DeltaState | null> {
+    return prisma.deltaState.findUnique({
+      where: { driveId },
+    });
+  }
 }
 
 export default new DeltaStateRepository();

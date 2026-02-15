@@ -315,15 +315,18 @@ function detectChangeType(deltaItem, existingItem) {
 FUNCTIONS_WORKER_RUNTIME=node
 FUNCTIONS_NODE_VERSION=18
 GRAPH_CLIENT_ID=<Azure AD App Registration>
-GRAPH_CLIENT_SECRET=<Set manually in Function App Settings - NEVER commit to repository>
+GRAPH_ACCESS_TOKEN=<Manually acquired OAuth token - Set manually in Function App Settings>
 GRAPH_TENANT_ID=<Azure AD Tenant>
 DATABASE_URL=<PostgreSQL connection string - Set manually in Function App Settings>
 WEBHOOK_CLIENT_STATE=<Random secret for validation - Set manually in Function App Settings>
+PROCESS_DELTA_ENABLED=false
 ```
 
 **Important Security Note:**
-- All secrets (`GRAPH_CLIENT_SECRET`, `DATABASE_URL`, `WEBHOOK_CLIENT_STATE`) MUST be configured manually in the Azure Function App Settings
+- All secrets (`GRAPH_ACCESS_TOKEN`, `DATABASE_URL`, `WEBHOOK_CLIENT_STATE`) MUST be configured manually in the Azure Function App Settings
 - These secrets should NEVER be stored in code, configuration files, or version control
+- The `GRAPH_ACCESS_TOKEN` must be a delegated user token acquired through OAuth 2.0 authorization code flow
+- The `PROCESS_DELTA_ENABLED` setting controls whether delta processing is active (disabled by default until `startRoutine` validates authentication)
 - For local development, use a `.env` file (already in `.gitignore`) to store secrets locally
 - Create a `.env.example` file with placeholder values as a template
 
@@ -395,28 +398,39 @@ WEBHOOK_CLIENT_STATE=<Random secret for validation - Set manually in Function Ap
 **Azure AD App Registration:**
 - Application type: Web app
 - Required API Permissions:
-  - `Files.Read.All` (Application permission)
-  - `Sites.Read.All` (Application permission)
-- Authentication: Client credentials flow
+  - `Files.Read.All` (Delegated permission)
+  - `Sites.Read.All` (Delegated permission)
+- Authentication: Authorization code flow (delegated permissions)
+- **Single-User Mode:** Application operates with a single user's OAuth token
 
-**Token Acquisition:**
+**Manual Token Management:**
+The application uses a manually acquired OAuth token that must be uploaded as a secret to Azure Function App Settings. This ensures the app never runs under app-wide permission scopes.
+
+**Token Acquisition Process (Manual):**
+1. Admin authenticates via OAuth 2.0 authorization code flow
+2. Acquires access token with delegated permissions
+3. Manually uploads token to Azure Function App Settings as `GRAPH_ACCESS_TOKEN`
+4. Token is validated on startup by `startRoutine` function
+
+**Token Usage:**
 ```typescript
-import { ClientSecretCredential } from '@azure/identity';
 import { Client } from '@microsoft/microsoft-graph-client';
-import { TokenCredentialAuthenticationProvider } from '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials';
 
-const credential = new ClientSecretCredential(
-  tenantId,
-  clientId,
-  clientSecret
-);
+// Access token retrieved from app settings
+const accessToken = process.env.GRAPH_ACCESS_TOKEN;
 
-const authProvider = new TokenCredentialAuthenticationProvider(credential, {
-  scopes: ['https://graph.microsoft.com/.default']
+const client = Client.init({
+  authProvider: (done) => {
+    done(null, accessToken);
+  }
 });
-
-const client = Client.initWithMiddleware({ authProvider });
 ```
+
+**Token Validation:**
+The `startRoutine` function validates the OAuth token before any operations:
+- If token is invalid or expired: Stop execution with error message
+- If token is valid: Proceed with webhook setup and delta sync
+- Function app must be manually restarted after token refresh
 
 ### Delta Query API
 
@@ -603,17 +617,18 @@ Manages active webhook subscriptions.
 ### Azure AD Authentication
 
 **Service Principal:**
-- Dedicated service principal for Graph API access
-- Application permissions (not delegated)
+- Delegated permissions (single-user model)
+- User-specific access token acquired manually
 - Principle of least privilege
 
 **Secrets Management:**
-- Client secrets stored in Azure Function App Settings
+- OAuth access token stored in Azure Function App Settings as `GRAPH_ACCESS_TOKEN`
 - Secrets are configured manually through Azure Portal or Azure CLI
 - Secrets never stored in code or configuration files committed to repository
+- Token must be refreshed manually when expired
 - For local development, use `.env` files (ignored by git)
-- Regular secret rotation recommended (manual process)
-- Use strong, randomly generated secrets (minimum 32 characters)
+- Regular token rotation required (manual process)
+- Use tokens from secure OAuth 2.0 authorization code flow
 
 ### Database Security
 

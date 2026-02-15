@@ -5,10 +5,11 @@
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "FUNCTIONS_NODE_VERSION": "18",
     "GRAPH_CLIENT_ID": "<your-azure-ad-app-registration-id>",
-    "GRAPH_CLIENT_SECRET": "<your-azure-ad-app-client-secret>",
+    "GRAPH_ACCESS_TOKEN": "<manually-acquired-oauth-access-token>",
     "GRAPH_TENANT_ID": "<your-azure-ad-tenant-id>",
     "DATABASE_URL": "postgresql://user:password@localhost:5432/onedriveaudit?sslmode=require",
-    "WEBHOOK_CLIENT_STATE": "<random-secret-string-min-32-chars>"
+    "WEBHOOK_CLIENT_STATE": "<random-secret-string-min-32-chars>",
+    "PROCESS_DELTA_ENABLED": "false"
   },
   "Host": {
     "LocalHttpPort": 7071,

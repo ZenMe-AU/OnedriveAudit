@@ -69,6 +69,16 @@ export class DriveItemRepository {
   }
 
   /**
+   * Mark a drive item as deleted by database ID (soft delete)
+   */
+  async markAsDeleted(id: number): Promise<DriveItem> {
+    return prisma.driveItem.update({
+      where: { id },
+      data: { isDeleted: true, modifiedAt: new Date() },
+    });
+  }
+
+  /**
    * Get all children of a drive item
    */
   async getChildren(parentId: number): Promise<DriveItem[]> {
