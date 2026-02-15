@@ -6,6 +6,8 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
+// Note: Prisma 7.x uses prisma.config.ts for datasource configuration
+// The DATABASE_URL is specified there instead of in the schema
 datasource db {
   provider = "postgresql"
 }

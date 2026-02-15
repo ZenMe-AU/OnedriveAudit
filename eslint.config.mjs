@@ -5,13 +5,14 @@ import tsparser from '@typescript-eslint/parser';
 export default [
   eslint.configs.recommended,
   {
-    files: ['**/*.ts'],
+    files: ['src/**/*.ts'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
         ecmaVersion: 2020,
         sourceType: 'module',
         project: './tsconfig.json',
+        tsconfigRootDir: import.meta.dirname,
       },
       globals: {
         // Node.js globals
@@ -23,7 +24,32 @@ export default [
         Buffer: 'readonly',
         global: 'readonly',
         globalThis: 'readonly',
-        // Jest globals for test files
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    // Test files - simpler config without project
+    files: ['tests/**/*.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 2020,
+        sourceType: 'module',
+      },
+      globals: {
+        // Node.js globals
+        process: 'readonly',
+        require: 'readonly',
+        // Jest globals
         describe: 'readonly',
         it: 'readonly',
         expect: 'readonly',
@@ -38,13 +64,11 @@ export default [
       '@typescript-eslint': tseslint,
     },
     rules: {
-      '@typescript-eslint/explicit-function-return-type': 'warn',
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
   {
-    ignores: ['node_modules/', 'dist/', '*.js', 'src/generated/**', 'prisma.config.ts'],
+    ignores: ['node_modules/', 'dist/', '**/*.js', '**/*.d.ts', '**/*.mjs', 'src/generated/**', 'prisma.config.ts'],
   },
 ];
