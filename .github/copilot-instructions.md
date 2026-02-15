@@ -136,6 +136,69 @@ This project is designed to be built by seven cooperating AI agents:
 
 When contributing, ensure your work aligns with the agent responsibilities and maintains consistency across the codebase.
 
+## Project Status and Documentation Maintenance
+
+**IMPORTANT**: After completing any task or implementing any significant change, you MUST update the project status documentation to reflect the current state of the project.
+
+### Required Updates After Task Completion
+
+1. **Update PROJECT-STATUS.md**
+   - Mark completed tasks with ✅ in the appropriate agent section
+   - Update completion percentages for the agent you're working on
+   - Move items from "Outstanding Items" to "Completed Items" as appropriate
+   - Update the "Overall Completion" percentage at the top of the file
+   - Update the "Current State" section to reflect the latest progress
+   - Add any new risks or issues discovered during implementation
+   - Update the "Last Updated" timestamp at the bottom
+
+2. **Update NEXT-STEPS.md**
+   - Mark completed steps with ✅ in the quick status table
+   - Update status indicators (🟢 Complete, 🟡 In Progress, ⚪ Not Started)
+   - Remove completed immediate next steps
+   - Add new immediate next steps based on current progress
+   - Update the "Last Updated" timestamp at the top
+
+3. **Update Relevant Agent Files**
+   - If working on a specific agent's tasks, update the corresponding agent specification file (e.g., `backend-agent.md`, `database-agent.md`)
+   - Mark completed deliverables
+   - Document any deviations from the original plan
+   - Note any blockers or dependencies discovered
+
+### When to Update Documentation
+
+- ✅ After completing a major milestone or deliverable
+- ✅ After finishing work on an entire agent's scope
+- ✅ After making significant architectural decisions
+- ✅ When discovering new dependencies or blockers
+- ✅ At the end of each working session or day
+- ✅ Before creating a pull request or committing major changes
+
+### Documentation Update Checklist
+
+Before considering a task complete, verify:
+- [ ] PROJECT-STATUS.md reflects the current completion state
+- [ ] NEXT-STEPS.md shows accurate immediate next steps
+- [ ] Completion percentages are updated
+- [ ] Status indicators are current
+- [ ] Timestamps are updated
+- [ ] Any blockers or risks are documented
+
+### Example: Completing Database Agent Tasks
+
+When the Database Agent completes the schema:
+1. Update `PROJECT-STATUS.md`:
+   - Change Database Agent from "Not Started - 0%" to "Complete - 100%"
+   - Move all database tasks from "Outstanding Items" to "Completed Items"
+   - Update overall project completion percentage
+2. Update `NEXT-STEPS.md`:
+   - Change Database Agent status from ⚪ to 🟢
+   - Update the immediate next steps to focus on the next agent
+3. Update `database-agent.md`:
+   - Mark all deliverables as complete
+   - Document the final schema location
+
+This ensures that all team members and agents have an accurate, real-time view of project progress and can coordinate their work effectively.
+
 ## Best Practices
 
 - Follow the principle of separation of concerns
