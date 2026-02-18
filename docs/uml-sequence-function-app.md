@@ -60,93 +60,100 @@ Initialize the system by setting up webhook subscription and performing initial 
 sequenceDiagram
     participant Admin as Admin/Scheduler
     participant Function as startRoutine<br/>(Function)
+    participant TokenValidator as Token<br/>Validator
     participant GraphClient as GraphClient<br/>Service
     participant Graph as Microsoft<br/>Graph
     participant DB as PostgreSQL<br/>Database
 
     Admin->>Function: HTTP GET/POST
     
-    Note over Function,Graph: 1. Authentication
-    Function->>GraphClient: 1. Authenticate
-    GraphClient->>Graph: 2. Get Access Token
-    Graph-->>GraphClient: Access Token
-    GraphClient-->>Function: Authenticated Client
+    Note over Function,TokenValidator: 1. Token Validation (Delegated Permissions)
+    Function->>TokenValidator: 1. Validate OAuth Token
+    TokenValidator->>Graph: 2. Test API Call (/me)
+    
+    alt Token is valid
+        Graph-->>TokenValidator: User Profile
+        TokenValidator-->>Function: Valid (userPrincipalName)
+    else Token is invalid/expired
+        Graph-->>TokenValidator: 401 Unauthorized
+        TokenValidator-->>Function: Invalid (error message)
+        Function-->>Admin: HTTP 401<br/>{error: "Token invalid"}
+        Note over Function: STOP EXECUTION<br/>Manual token refresh required
+    end
     
     Note over Function,Graph: 2. Webhook Subscription Management
-    Function->>GraphClient: 3. Get Existing Subscriptions
-    GraphClient->>Graph: 4. GET /subscriptions
+    Function->>GraphClient: 3. Get User Drive ID
+    GraphClient->>Graph: 4. GET /me/drive
+    Graph-->>GraphClient: Drive Info
+    GraphClient-->>Function: Drive ID
+    
+    Function->>GraphClient: 5. Ensure Subscription
+    GraphClient->>Graph: 6. GET /subscriptions
     Graph-->>GraphClient: Subscription List
-    GraphClient-->>Function: Subscriptions
     
     alt Subscription exists and not expired
-        Function->>GraphClient: 5. Update Expiration
-        GraphClient->>Graph: 6. PATCH /subscriptions/{id}
+        GraphClient->>Graph: 7. PATCH /subscriptions/{id}
         Graph-->>GraphClient: Updated Subscription
-        GraphClient-->>Function: Subscription
     else Create new subscription
-        Function->>GraphClient: 7. Create Subscription
         GraphClient->>Graph: 8. POST /subscriptions<br/>{changeType, resource, notificationUrl, clientState}
         Graph->>Function: 9. Validation Request (validationToken)
         Function-->>Graph: Return validationToken
         Graph-->>GraphClient: Subscription Created
-        GraphClient-->>Function: Subscription
     end
     
-    Function->>DB: 10. Save Subscription
-    Note right of DB: INSERT INTO webhook_subscriptions
-    DB-->>Function: Saved
+    GraphClient->>DB: 10. Save Subscription
+    Note right of DB: UPSERT webhook_subscriptions
+    DB-->>GraphClient: Saved
+    GraphClient-->>Function: Subscription
     
-    Note over Function,DB: 3. Delta Synchronization
-    Function->>DB: 11. Get Delta Token
-    Note right of DB: SELECT delta_token FROM delta_state
-    DB-->>Function: Token (or null)
+    Note over Function,DB: 3. Initial Delta Synchronization
+    Function->>DB: 11. Clear Delta Token
+    Note right of DB: Force full sync
+    DB-->>Function: Success
     
-    alt Token exists
-        Function->>GraphClient: 12. Delta Query (incremental)
-        GraphClient->>Graph: 13. GET {deltaLink}
-    else Initial delta query
-        Function->>GraphClient: 14. Delta Query (initial)
-        GraphClient->>Graph: 15. GET /drives/{id}/root/delta
-    end
+    Function->>GraphClient: 12. Perform Initial Sync
+    GraphClient->>Graph: 13. GET /drives/{id}/root/delta
     
     loop For each page of results
         Graph-->>GraphClient: Delta Response<br/>{value: [items], @odata.nextLink, @odata.deltaLink}
-        GraphClient-->>Function: Delta Items
-        
-        Function->>GraphClient: 16. Process Items
         
         loop For each item
-            GraphClient->>DB: 17. Upsert DriveItem
+            GraphClient->>DB: 14. Upsert DriveItem
             Note right of DB: INSERT ... ON CONFLICT UPDATE
             DB-->>GraphClient: Success
             
-            GraphClient->>DB: 18. Insert ChangeEvent
+            GraphClient->>DB: 15. Insert ChangeEvent
             Note right of DB: INSERT INTO change_events
             DB-->>GraphClient: Success
         end
         
-        GraphClient-->>Function: Items Processed
-        
         opt If @odata.nextLink
-            Function->>GraphClient: 19. Get Next Page
-            GraphClient->>Graph: 20. GET {nextLink}
+            GraphClient->>Graph: 16. GET {nextLink}
         end
     end
     
-    Function->>DB: 21. Update Delta Token
+    GraphClient->>DB: 17. Update Delta Token
     Note right of DB: INSERT/UPDATE delta_state
-    DB-->>Function: Success
+    DB-->>GraphClient: Success
+    GraphClient-->>Function: Sync Result
     
-    Function-->>Admin: HTTP 200 OK<br/>{message: "Initialized", itemsProcessed: N}
+    Note over Function: 4. Enable Delta Processing
+    Function->>Function: 18. Set PROCESS_DELTA_ENABLED=true
+    Note over Function: In-memory update<br/>App settings must be updated for persistence
+    
+    Function-->>Admin: HTTP 200 OK<br/>{message: "Initialized", userPrincipalName, itemsProcessed: N}
 ```
 
 ### Key Steps
 
-1. **Authentication (Steps 1-2)**
-   - Use Azure Identity to get access token
-   - Client credentials flow with app registration
+1. **Token Validation (Steps 1-2) - DELEGATED PERMISSIONS**
+   - Validate manually acquired OAuth access token
+   - Token must have delegated permissions (Files.Read.All, Sites.Read.All)
+   - If invalid: STOP execution, return 401, require manual token refresh
+   - If valid: Continue with initialization
 
 2. **Subscription Management (Steps 3-10)**
+   - Get user's drive ID using delegated permissions
    - Check for existing subscription
    - Renew if exists and approaching expiration
    - Create new if none exists or expired

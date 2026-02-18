@@ -81,7 +81,16 @@ export class WebhookSubscriptionRepository {
   /**
    * Delete a subscription
    */
-  async delete(subscriptionId: string): Promise<WebhookSubscription> {
+  async delete(id: number): Promise<WebhookSubscription> {
+    return prisma.webhookSubscription.delete({
+      where: { id },
+    });
+  }
+
+  /**
+   * Delete a subscription by subscription ID
+   */
+  async deleteBySubscriptionId(subscriptionId: string): Promise<WebhookSubscription> {
     return prisma.webhookSubscription.delete({
       where: { subscriptionId },
     });
@@ -99,6 +108,46 @@ export class WebhookSubscriptionRepository {
       },
     });
     return result.count;
+  }
+
+  /**
+   * Update subscription expiration by database ID
+   */
+  async updateExpirationById(id: number, expiration: Date): Promise<WebhookSubscription> {
+    return prisma.webhookSubscription.update({
+      where: { id },
+      data: { expiration },
+    });
+  }
+
+  /**
+   * Find subscriptions by resource
+   */
+  async findByResource(resource: string): Promise<WebhookSubscription[]> {
+    return prisma.webhookSubscription.findMany({
+      where: { resource },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Upsert a subscription
+   */
+  async upsert(data: {
+    subscriptionId: string;
+    resource: string;
+    clientState: string;
+    expiration: Date;
+  }): Promise<WebhookSubscription> {
+    return prisma.webhookSubscription.upsert({
+      where: { subscriptionId: data.subscriptionId },
+      update: {
+        resource: data.resource,
+        clientState: data.clientState,
+        expiration: data.expiration,
+      },
+      create: data,
+    });
   }
 }
 
